@@ -1,1 +1,346 @@
 hadoop standalon (single node)
+
+notas de instalação para facilidade de partilha
+
+
+------------------------
+
+
+--prévio ajustar o ecran
+
+sudo nano /etc/default/grub
+GRUP_CMDLINE_LINUX_DEFAULT="quiet splash video=hyperv_fb:1024x756"
+
+sudo update-grub
+
+
+--prévo instalar samba e share desktop
+
+sudo apt update
+sudo apt install samba
+
+whereis samba
+
+sudo nano /etc/samba/smb.conf
+
+[desktop10$]
+  comment = desktop10
+  path = /home/cesar/Desktop
+  browseable = yes
+  read only = no
+  guest ok = yes
+
+	
+sudo service smbd restart
+alterar firewall
+ sudo ufw allow samba
+ 
+ ------
+ ------
+ previo
+ 
+ Hyper-V enhanced-session
+ cd ~/Downloads/
+ 
+ wget https://raw.githubusercontent.com/Hinara/linux-vm-tools/ubuntu20-04/ubuntu/20.04/install.sh
+
+sudo chmod +x install.sh
+
+sudo ./install.sh
+
+--depois do reboot , repetir o install
+
+sudo ~/Downloads/install.sh
+
+---irá ser necessário novo reboot no fim
+
+-- e no PowerShell do Windos Host
+
+Set-VM -VMName "lpc010" -EnhancedSessionTransportType HvSocket
+
+--------------------------
+--------------------------
+No fim iniciar automaticamente com o servidor
+
+--cheklist  rever os valores do user grupo e paths, type is fork,
+-- pid file is set and is aactual pid that start-dfs.sh creates
+--enviroment variables are correct
+
+[Unit]
+Description = Hadoop DFS namenode and datanode
+After=syslog.target network.target remote-fs.target nss-lookup.target network-online.target
+Requires=network-online.target
+
+[Service]
+User=hdpuser
+Group=hdpgrp
+Type=forking
+ExevStart=/usr/local/hadoop/sbin/start-dfs.sh
+ExecStop=/usr/local/hadoop/sbin/stop-dfs.sh
+WorkingDirectory=/usr/local/hadoop
+Enviroment=JAVA_HOME=...
+Enviroment=HADOOP_HOME=/usr/local/hadoop
+TimeoutStartSec=2mn
+Restart=on-failure
+PIDFile=/tmp/hadoop-hadoop-nodename.pid
+
+[Install]
+WantedBy=multi-user.target
+
+---------ALTERANATIVA ONESHOT----
+
+[Unit]
+Description = Hadoop DFS namenode and datanode & yarn service
+After=syslog.target network.target 
+
+
+[Service]
+User=hdpuser
+Group=hdpgrp
+Type=oneshot
+ExevStartPre=/usr/local/hadoop/sbin/start-dfs.sh
+ExevStart=/usr/local/hadoop/sbin/start-yarn.sh
+ExecStop=/usr/local/hadoop/sbin/stop-dfs.sh
+ExecStopPost=/usr/local/hadoop/sbin/stop-yarn.sh
+WorkingDirectory=/usr/local/hadoop
+Enviroment=JAVA_HOME=...
+Enviroment=HADOOP_HOME=/usr/local/hadoop
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+
+-------------------------------
+INSTALAÇÂO
+--------------------------------
+
+--actualizar a tool apt
+sudo apt update
+
+--------------------------------
+--------------------------------
+
+--Instalar o java ( pelo menos o 8)
+
+sudo apt install default-jre -y
+--ou
+sudo apt install openjdk-8-jdk -y
+
+--para verificar
+java -version 
+
+
+--para saber o que foi installado
+
+readlink -f $(which java)
+--dá o path do java
+/usr/lib/jvm/java-11-openjdk-amd64/bin/java
+--logo  o home é 
+--export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+
+
+----------------------------------
+----------------------------------
+
+--Install OpenSSH on Ubuntu
+sudo apt install openssh-server openssh-client -y
+
+--( verificar se ´e necess´ario alterar o port ssh 22 )
+
+
+
+
+--------------------------------
+--------------------------------
+--setup a non root user for hadoop
+
+sudo adduser hdpuser
+pw 1234
+
+--------------------------------
+--------------------------------
+--setup hadoop group ( ainda não sei se vai ser necessário)
+
+sudo addgroup hdpgrp
+
+--e o user ao group
+
+sudo usermod -g hdpgrp hdpuser
+
+
+--------------------------------
+--------------------------------
+--enable passwordless ssh for hadoop user
+
+--login com hdpuser:
+sudo su - hdpuser
+
+ssh-keygen -t rsa -P '' -f ~/.ssh/id_rsa
+cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
+chmod 0600 ~/.ssh/authorized_keys
+
+---------------------------------
+---------------------------------
+--com o user cesar ( root)
+--adicionar o user hdpuser ao grupo sudo
+sudo adduser hdpuser sudo
+
+
+
+----------------------------------------
+---------------------------------------
+
+--com o user hdpuser ( portanto estamos no home do user)
+--download da versão do hadoop diretamente do APACHE
+ 
+wget https://dlcdn.apache.org/hadoop/common/hadoop-3.2.2/hadoop-3.2.2.tar.gz --no-check-certificate
+
+
+--extrair os ficheiros
+
+tar xzf hadoop-3.2.2.tar.gz 
+
+--o folder está no ~/hadoop-3.2.2
+
+
+--------------------------------
+--------------------------------
+
+--o hadoop nºao fica dentro da home do user (não sei se pode ou deve )
+--logo movemos para fora
+ cd ~/hadoop-3.2.2
+ 
+ sudo mv * /usr/local/hadoop
+
+-- e atualizamos o owner e o grupo
+
+sudo chown -R hdpuser:hdpgrp /usr/local/hadoop
+
+-----------------------------------
+--------------------------------
+SETUP CONFIGURATIONS
+nos ficheiros 
+
+~/.bashrc
+/usr/local/hadoop/etc/hadoop/hadoop-env.sh
+/usr/local/hadoop/etc/hadoop/core-site.xml
+/usr/local/hadoop/etc/hadoop/mapred-site.xml
+/usr/local/hadoop/etc/hadoop/hdfs-site.xml
+
+--1
+sudo nano ~/.bashrc
+
+#HADOOP VARIABLES START
+export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+export HADOOP_INSTALL=/usr/local/hadoop
+export HADOOP_HDFS_HOME=$HADOOP_INSTALL
+export HADOOP_MAPRED_HOME=$HADOOP_INSTALL
+export YARN_HOME=$HADOOP_INSTALL
+export HADOOP_COMMON_HOME=$HADOOP_INSTALL
+export HADOOP_COMMON_LIB_NATIVE_DIR=$HADOOP_INSTALL/lib/native
+#export PATH=$PATH:$JAVA_HOME/bin:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
+export HADOOP_OPS="$HADOOP_OPS -Djava.library.path=$HADOOP_INSTALL/lib"
+#HADOOP VARIABLES END
+
+source ~/.bashrc
+
+--2
+sudo nano /usr/local/hadoop/etc/hadoop/hadoop-env.sh
+
+export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+
+--3
+--antes criar o tmp dir
+
+sudo mkdir -p /app/hadoop/tmp
+sudo chown hdpuser:hdpgrp /app/hadoop/tmp
+
+sudo nano /usr/local/hadoop/etc/hadoop/core-site.xml
+
+<configuration>
+<property> 
+<name>hadoop.tmp.dir</name>
+<value>/app/hadoop/tmp</value>
+<description> A base for other temporary directories </description>
+</property> 
+<property> 
+<name>fs.default.name</name>
+<value>hdfs://localhost:19000</value>
+<description> The name of the default file system. 
+A URI whose scheme and authority determine the FileSystem implementation. 
+The uri's scheme determines the config property (fs.SCHEME.impl) naming the FileSystem implementation class. 
+The uri's authority is used to  determine the host, port, etc for a filesystem. </description>
+</property> 
+</configuration>
+
+--4
+sudo nano /usr/local/hadoop/etc/hadoop/mapred-site.xml
+
+<configuration>
+<property> 
+<name>mapred.job.traker</name>
+<value>hdfs:localhost:19001</value>
+<description> The host and port that MapReduce job traker runs at.
+If local, then are run in-process as single map and reduce task. </description>
+</property> 
+</configuration>
+
+--5
+ the /usr/local/hadoop/etc/hadoop/hdfs-site.xml  file needs to be  
+ configured for each host in the cluster that is being used.
+ It specifies the directories whitch will be used as the namenode  and the datanode on that host
+ 
+ Before we need to create this two directories (o hadoop_store ainda não existe)
+ 
+ sudo mkdir -p /usr/local/hadoop_store/hdfs/namenode
+ sudo mkdir -p /usr/local/hadoop_store/hdfs/datanode
+ 
+ sudo chown -R hdpuser:hdpgrp /usr/local/hadoop_store
+ ---
+
+sudo nano /usr/local/hadoop/etc/hadoop/hdfs-site.xml
+
+<property> 
+<name>dfs.replication</name>
+<value>1</value>
+</property> 
+<property> 
+<name>dfs.block.size</name>
+<value>1048576</value>
+</property>
+<property> 
+<name>dfs.namenode.name.dir</name>
+<value>file:/usr/local/hadoop_store/hdfs/namenode</value>
+<description>NameNode directory for namespace and transaction logs storage</description>
+</property> 
+<property> 
+<name>dfs.datanode.data.dir</name>
+<value>file:/usr/local/hadoop_store/hdfs/datanode</value>
+<description>DataNode directory</description>
+</property> 
+
+--------------------------
+FORMAT
+
+hadoop namenode -format
+
+
+
+-------------------------------------
+INSTALAR FIM
+----------------------------------
+----------------------------------
+
+testar
+
+
+
+
+
+
+
+
+
+
+
+
