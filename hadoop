@@ -4,7 +4,7 @@ notas de instalação para facilidade de partilha
 
 
 ------------------------
-
+-- ajustes previos na VM , só para maior facilide de trabalho
 
 --prévio ajustar o ecran
 
@@ -13,8 +13,8 @@ GRUP_CMDLINE_LINUX_DEFAULT="quiet splash video=hyperv_fb:1024x756"
 
 sudo update-grub
 
-
---prévo instalar samba e share desktop
+----------------------
+--prévo instalar samba e share desktop 
 
 sudo apt update
 sudo apt install samba
@@ -39,7 +39,7 @@ alterar firewall
  ------
  previo
  
- Hyper-V enhanced-session
+ -- Hyper-V enhanced-session  
  cd ~/Downloads/
  
  wget https://raw.githubusercontent.com/Hinara/linux-vm-tools/ubuntu20-04/ubuntu/20.04/install.sh
